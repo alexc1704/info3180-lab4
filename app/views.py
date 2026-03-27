@@ -8,6 +8,10 @@ from app.forms import LoginForm
 from flask_login import login_user
 from werkzeug.security import check_password_hash
 from app.models import UserProfile
+from app.forms import UploadForm
+from flask_login import login_required
+from werkzeug.utils import secure_filename
+from flask import send_from_directory
 
 
 ###
@@ -38,6 +42,13 @@ def upload():
         return redirect(url_for('home')) # Update this to redirect the user to a route that displays all uploaded image files
 
     return render_template('upload.html')
+
+@app.route('/uploads/<filename>')
+def get_image(filename):
+    return send_from_directory(
+        os.path.join(os.getcwd(), app.config['UPLOAD_FOLDER']),
+        filename
+    )
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -71,7 +82,15 @@ def load_user(id):
 ###
 # The functions below should be applicable to all Flask apps.
 ###
+def get_uploaded_images():
+    folder = os.path.join(os.getcwd(), app.config['UPLOAD_FOLDER'])
 
+    files = []
+
+    for filename in os.listdir(folder):
+        files.append(filename)
+
+    return files
 # Flash errors from the form if validation fails
 def flash_errors(form):
     for field, errors in form.errors.items():
@@ -103,3 +122,27 @@ def add_header(response):
 def page_not_found(error):
     """Custom 404 page."""
     return render_template('404.html'), 404
+
+
+@app.route('/upload', methods=['GET', 'POST'])
+@login_required
+def upload():
+    form = UploadForm()
+
+    if form.validate_on_submit():
+        file = form.photo.data
+
+        filename = secure_filename(file.filename)
+
+        filepath = os.path.join(
+            os.getcwd(),
+            app.config['UPLOAD_FOLDER'],
+            filename
+        )
+
+        file.save(filepath)
+
+        flash('File uploaded successfully!', 'success')
+        return redirect(url_for('upload'))
+
+    return render_template('upload.html', form=form)
